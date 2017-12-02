@@ -1,0 +1,508 @@
+---
+title: "Challenge B"
+author: "Pascale Champalaune - Lisa Forestier - Louis Sirugue"
+date: "Due date: 8th of December, 2017"
+output: html_document
+---
+
+URL of our repository: https://github.com/LouisSirugue/CHALLENGE_B_2017
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+```{r, include=FALSE}
+
+load.libraries <- c('readxl','np','tidyverse', 'randomForest', 'car', 'caret', 'knitr', 'stringr', 'dplyr')
+install.lib <- load.libraries[!load.libraries %in% installed.packages()]
+for(libs in install.lib) install.packages(libs, dependencies = TRUE)
+sapply(load.libraries, require, character = TRUE)
+
+```
+
+# Task 1B - Predicting house prices in Ames, Iowa (continued)
+
+### Step 1
+
+We are going to use the Random Forests method. The idea behind this method is that it tries a lot of different models (Decision Trees) and combines them in order to optimise the model by reducing the variance in the Trees by averaging them.
+
+### Step 2
+
+We train the Random Forests technique on the training data.
+
+```{r, include=FALSE}
+
+rm(list=ls())
+
+train <- read.table(file = "train.csv", header = TRUE, sep = ",")
+
+attach(train)
+
+#We delete the missing observations.
+#We begin by plotting them.
+
+train %>% summarise_all(.funs = funs(sum(is.na(.)))) %>% gather(key = "feature", value = "missing.observations") %>% filter(missing.observations > 0)
+
+plot_Missing <- function(data_in, title = NULL){
+  temp_df <- as.data.frame(ifelse(is.na(data_in), 0, 1))
+  temp_df <- temp_df[,order(colSums(temp_df))]
+  data_temp <- expand.grid(list(x = 1:nrow(temp_df), y = colnames(temp_df)))
+  data_temp$m <- as.vector(as.matrix(temp_df))
+  data_temp <- data.frame(x = unlist(data_temp$x), y = unlist(data_temp$y), m = unlist(data_temp$m))
+  ggplot(data_temp) + geom_tile(aes(x=x, y=y, fill=factor(m))) + scale_fill_manual(values=c("white", "black"), name="Missing\n(0=Yes, 1=No)") + theme_light() + ylab("") + xlab("") + ggtitle(title)
+}
+
+plot_Missing(train[,colSums(is.na(train)) > 0])
+
+#Then we remove the variables that have 100 missing observations or more and that are not too important to explain the sale price.
+
+remove.vars <- train %>% summarise_all(.funs = funs(sum(is.na(.)))) %>% gather(key = "feature", value = "missing.observations") %>% filter(missing.observations > 100) %>% select(feature) %>% unlist
+
+train <- train %>% select(- one_of(remove.vars))
+
+#Then we remove the missing observations for important variables.
+
+train %>% summarise_all(.funs = funs(sum(is.na(.)))) %>% gather(key = "feature", value = "missing.observations") %>% filter(missing.observations > 0)
+
+train <- train %>% filter(is.na(GarageType) == FALSE, is.na(MasVnrType) == FALSE, is.na(BsmtFinType2) == FALSE, is.na(BsmtExposure) == FALSE, is.na(Electrical) == FALSE)
+
+#We make sure the data set is clear of all missing observations. It is.
+
+train %>% summarise_all(.funs = funs(sum(is.na(.)))) %>% gather(key = "feature", value = "missing.observations") %>% filter(missing.observations > 0)
+
+```
+
+```{r, include=FALSE}
+
+#We finally apply the random forests method to the training data.
+training.rf = randomForest(SalePrice ~ MSSubClass + MSZoning + LotArea + Street + LotShape
+                           + LandContour + Utilities + LotConfig + LandSlope + Neighborhood
+                           + Condition1 + Condition2 + BldgType + HouseStyle + OverallQual
+                           + OverallCond + YearBuilt + YearRemodAdd + RoofStyle + RoofMatl
+                           + Exterior1st + Exterior2nd + MasVnrType + MasVnrArea + ExterQual
+                           + ExterCond + Foundation + BsmtQual + BsmtCond + BsmtExposure
+                           + BsmtFinType1 + BsmtFinType2 + BsmtFinSF1 + BsmtFinSF2
+                           + BsmtUnfSF + TotalBsmtSF + Heating + HeatingQC + CentralAir
+                           + Electrical + X1stFlrSF + X2ndFlrSF + LowQualFinSF + GrLivArea
+                           + BsmtFullBath + BsmtHalfBath + FullBath + HalfBath
+                           + BedroomAbvGr + KitchenAbvGr + KitchenQual + TotRmsAbvGrd
+                           + Functional + Fireplaces + GarageType + GarageYrBlt
+                           + GarageFinish + GarageCars + GarageArea + GarageQual
+                           + GarageCond + PavedDrive + WoodDeckSF + OpenPorchSF
+                           + EnclosedPorch + X3SsnPorch + ScreenPorch + PoolArea + MiscVal
+                           + YrSold + SaleType + SaleCondition, data = train)
+training.rf
+
+```
+Type of random forest: regression  
+Number of trees: 500  
+No. of variables tried at each split: 24  
+Mean of squared residuals: 797703297  
+% Var explained: 87.18  
+                    
+### Step 3
+
+We use the Random Forests model to make predictions on the test data.
+
+```{r, include=FALSE}
+
+test <- read.table(file = "test.csv", header = TRUE, sep = ",")
+
+attach(test)
+
+#We delete the missing observations.
+#We begin by plotting them.
+
+test %>% summarise_all(.funs = funs(sum(is.na(.)))) %>% gather(key = "feature", value = "missing.observations") %>% filter(missing.observations > 0)
+
+plot_Missing <- function(data_in, title = NULL){
+  temp_df <- as.data.frame(ifelse(is.na(data_in), 0, 1))
+  temp_df <- temp_df[,order(colSums(temp_df))]
+  data_temp <- expand.grid(list(x = 1:nrow(temp_df), y = colnames(temp_df)))
+  data_temp$m <- as.vector(as.matrix(temp_df))
+  data_temp <- data.frame(x = unlist(data_temp$x), y = unlist(data_temp$y), m = unlist(data_temp$m))
+  ggplot(data_temp) + geom_tile(aes(x=x, y=y, fill=factor(m))) + scale_fill_manual(values=c("white", "black"), name="Missing\n(0=Yes, 1=No)") + theme_light() + ylab("") + xlab("") + ggtitle(title)
+}
+
+plot_Missing(test[,colSums(is.na(test)) > 0])
+
+#Then we remove the variables that have 100 missing observations or more and that are not too important to explain the sale price.
+
+remove.vars <- test %>% summarise_all(.funs = funs(sum(is.na(.)))) %>% gather(key = "feature", value = "missing.observations") %>% filter(missing.observations > 100) %>% select(feature) %>% unlist
+
+test <- test %>% select(- one_of(remove.vars))
+
+#Then we remove the missing observations for important variables.
+
+test %>% summarise_all(.funs = funs(sum(is.na(.)))) %>% gather(key = "feature", value = "missing.observations") %>% filter(missing.observations > 0)
+
+test <- test %>% filter(is.na(GarageType) == FALSE, is.na(MasVnrType) == FALSE, is.na(BsmtFinType2) == FALSE, is.na(BsmtExposure) == FALSE, is.na(Electrical) == FALSE)
+
+#We make sure the data set is clear of all missing observations. It is.
+
+test %>% summarise_all(.funs = funs(sum(is.na(.)))) %>% gather(key = "feature", value = "missing.observations") %>% filter(missing.observations > 0)
+
+#We tell R that the variables in the two data sets are the same so as to make predictions on the test dataset based on the training dataset.
+
+common <- intersect(names(train), names(test)) 
+for (p in common) { 
+  if (class(train[[p]]) == "factor") { 
+    levels(test[[p]]) <- levels(train[[p]]) 
+  } 
+}
+
+test.rf <- predict(object = training.rf, newdata = test, predict.all = FALSE)
+
+```
+
+Then, we estimate a simple linear regression model based on the training data, from which we deleted the missing observations and the ID feature. We use the variables that were in the best regression we made during the first challenge. 
+
+```{r, include=FALSE}
+
+reg <- lm(SalePrice ~ MSSubClass + LotArea + OverallQual + OverallCond + YearBuilt
+          + MasVnrArea + BsmtFinSF1 + X1stFlrSF + X2ndFlrSF + BsmtFullBath + BedroomAbvGr
+          + KitchenAbvGr + TotRmsAbvGrd + Fireplaces + GarageCars + WoodDeckSF
+          + ScreenPorch + PoolArea, data = train)
+preds <- predict.lm(reg, test)
+
+```
+
+We plot the predictions given both by the Random Forests model and the simple linear regression model.
+
+```{r, echo=FALSE}
+
+ggplot() + geom_line(aes(x = test$Id, y = preds), colour = "blue") + geom_point(aes(x = test$Id, y = test.rf), colour = "green", size = 1)
+
+```
+
+Both predictions seem to follow the same trend. However, if we do not take the extreme prediction right after 2,500 into account, the predictions given by the Random Forests model (green dots) are higher than those given by the linear model (blue line).  
+The difference in their variances is difficult to identify visually.
+
+
+# Task 2B - Overfitting in Machine Learning (continued)
+
+```{r, include=FALSE}
+
+#Previously, in "Overfitting in Machine Learning"
+
+rm(list=ls())
+
+set.seed(1)
+Nsim <- 150
+b <- c(0,1)
+x0 <- rep(1, Nsim)
+x1 <- rnorm(n = Nsim)
+
+X <- cbind(x0, x1^3)
+y.true <- X %*% b
+
+eps <- rnorm(n = Nsim)
+y <- X %*% b + eps
+
+dataframe <- tbl_df(y[,1]) %>% rename(y = value) %>% bind_cols(tbl_df(x1)) %>% rename(x = value) %>% bind_cols(tbl_df(y.true[,1])) %>% rename(y.true = value)
+
+training.index <- createDataPartition(y = y, times = 1, p = 0.8)
+dataframe <- dataframe %>% mutate(which.data = ifelse(1:n() %in% training.index$Resample1, "training2", "test2"))
+
+training2 <- dataframe %>% filter(which.data == "training2")
+test2 <- dataframe %>% filter(which.data == "test2")
+
+```
+
+### Step 1
+
+Here is the summary of the low flexibility local linear model.
+
+```{r, echo=FALSE}
+
+ll.fit.lowflex <- npreg(y ~ x, data = training2, method = "ll", bws = 0.5)
+summary(ll.fit.lowflex)
+
+```
+
+### Step 2
+
+Here is the summary of the high flexibility local linear model.
+
+```{r, echo=FALSE}
+
+ll.fit.highflex <- npreg(y ~ x, data = training2, method = "ll", bws = 0.01)
+summary(ll.fit.highflex)
+
+dataframe <- dataframe %>% mutate(y.ll.lowflex = predict(object = ll.fit.lowflex, newdata = dataframe), y.ll.highflex = predict(object = ll.fit.highflex, newdata = dataframe))
+
+training2 <- training2 %>% mutate(y.ll.lowflex = predict(object = ll.fit.lowflex, newdata = training2), y.ll.highflex = predict(object = ll.fit.highflex, newdata = training2))
+
+```
+
+### Step 3
+
+The following graph depicts, for the training data:
+  + The observations from the test dataset (black dots)
+  + The true model (black line)
+  + The predictions given by the high flexibility local linear model (blue line)
+  + The predictions given by the low flexibility local linear model (red line)
+
+```{r, echo=FALSE}
+
+ggplot(data=training2) + geom_point(aes(x,y)) + geom_line(aes(x=x,y=x^3), colour = "black" ) + geom_line(aes(x=x, y=y.ll.highflex), colour = "blue") + geom_line(aes(x=x, y=y.ll.lowflex), colour = "red")
+
+```
+
+### Step 4
+
+The predictions which are the most variable are those from the model with high flexibility (the blue line). Indeed, we can see that the line jumps from point to point almost perfectly. However, this is also the one with the most biased predictions. Indeed, the path of the predictions from the model with low flexibility is smoother, so it's supposed to reduce the average gap between the predictions and the future values (that we would actually observe *ex post*).
+
+### Step 5
+
+The following graph depicts, for the test data:  
+  + The observations from the test dataset (red dots)  
+  + The true model (red line)  
+  + The predictions given by the high flexibility local linear model (green line)  
+  + The predictions given by the low flexibility local linear model (blue line)
+
+```{r, echo=FALSE}
+
+#We add the predictions based on both the high and low flexibility models in the dataset "test2"
+test2 <- test2 %>% mutate(y.ll.lowflex = predict(object = ll.fit.lowflex, newdata = test2), y.ll.highflex = predict(object = ll.fit.highflex, newdata = test2))
+
+#
+test.hf <- predict(object = ll.fit.highflex, x = test2$x, y = test2$y, se.fit = FALSE, level = 0.95)
+test.lf <- predict(ll.fit.lowflex, newdata = test2, se.fit = FALSE, level = 0.95)
+
+ggplot(data=test2) + geom_line(aes(x=test2$x,y=y.ll.highflex), colour="green") +             geom_line(aes(x=test2$x,y=y.ll.lowflex),colour="blue") + geom_point(aes(x=test2$x,y=test2$y), colour="red") +
+  geom_line(aes(x=x,y=x^3), colour = "red" )
+
+```
+
+The predictions which are the most variable are those from the model with high flexibility (the green line). Indeed, we can see that the predictions are highly volatile, compared to the predictions given by the low flexibility model (blue line).  
+However, the high flexibility model gives the most biased predictions. Indeed, the gaps between the red dots and the green line seem to greater on average than the gaps between the red dots and the blue line. This means that the low flexibility model may lead to less biased predictions.
+
+### Step 6
+
+We create a vector of bandwidth going from 0.01 to 0.5 with a step of 0.001.
+
+```{r vector, include=FALSE}
+
+vector <- seq(from = 0.01, to = 0.5, by = 0.001)
+length(vector)
+
+```
+
+### Step 7
+
+We estimate a local linear model on the training data with each bandwidth.
+
+```{r, include=FALSE}
+
+#We apply the function npreg on the training data.
+#Each element of the vector will determine the bandwidth that will be used for each model.
+llvector.fit <- lapply(X = vector, FUN = function(vector) {npreg(y ~ x, data = training2, method = "ll", bws = vector)})
+
+```
+
+We obtain 491 different models: one for each bandwidth.
+
+### Step 8
+
+We compute the MSE on the training data, and this for each bandwidth.
+
+```{r, include=FALSE}
+
+#We create an object, fit.model, that will be used just for the loop
+#mse.training will be a function that computes the MSE for each model
+mse.training <- function(fit.model){
+  predictions <- predict(object = fit.model, newdata = training2)
+  training2 %>% mutate(squared.error = (y - predictions)^2) %>% summarize(mse = mean(squared.error))
+}
+
+#We apply the function mse.training on our vector of models
+#We use the function "unlist" to flatten it and get a vector of results
+mse.train.results <- unlist(lapply(X = llvector.fit, FUN = mse.training))
+
+```
+We obtain a vector of 491 different MSEs, one for each model.
+
+### Step 9
+
+We compute the MSE on the test data, and this for each bandwidth.
+
+```{r, include=FALSE}
+
+#We use the same strategy as the one used for step 8, but this time on the test data
+mse.test <- function(fit.model){
+  predictions <- predict(object = fit.model, newdata = test2)
+  test2 %>% mutate(squared.error = (y - predictions)^2) %>% summarize(mse = mean(squared.error))
+}
+mse.test.results <- unlist(lapply(X = llvector.fit, FUN = mse.test))
+
+```
+Again, we obtain a vector of 491 different MSEs, one for each model.
+
+### Step 10
+
+We plot how the Mean Squared Errors on the training and test data change when the bandwidth
+increases. The blue line corresponds on the MSEs of the training data, whereas the orange line shows the change in the MSEs as the bandwidth increases.
+
+```{r, echo=FALSE}
+
+#We put the results obtained beforehand in a data frame so as to plot the MSEs more easily
+mse.dataframe <- tbl_df(data.frame(bandwidth = vector, mse.train = mse.train.results, mse.test = mse.test.results))
+
+ggplot(mse.dataframe) + 
+  geom_line(mapping = aes(x = vector, y = mse.train), color = "blue") +
+  geom_line(mapping = aes(x = vector, y = mse.test), color = "orange")
+
+```
+
+First, the lower the bandwidth, the more flexible the model. This explains why the blue line starts almost at the origin of the graph: a curve illustrating a model with full flexibility will connect all the dots, so the Mean Squared Error will be equal to zero. For the same reason, the MSE will increase as the bandwidth increases, as the curve will get smoother.  
+However, as the bandwidth is low, the MSE will be very large because of the bias, as illustrated in the fifth step. The MSE will decrease as the bandwidth increases, until a certain threshold: when the bandwidth is too large, the curve is too smooth (and resembles more and more to an affine function). In our case, the optimal bandwidth would be the one at which the MSE is minimised, that is, when the slope of the orange curve is equal to zero (i.e. visually, around a 0.23 bandwidth).
+
+# Task 3B - Privacy regulation compliance in France
+
+### Step 1
+
+We import the CIL dataset.
+
+```{r, include=FALSE}
+
+rm(list=ls())
+
+CIL <- read.csv(file="CIL.csv", header=TRUE, sep=";")
+attach(CIL)
+
+```
+
+### Step 2
+
+```{r, eval=FALSE, include=FALSE}
+
+View(CIL)
+
+```
+
+By viewing the data and ordering it by postcode, two problems arise:  
+- Some companies who nominated a CIL gave a non-French postal code.  
+- The data was not coded properly: some observations have the postal code and the city inverted, or simply the postal code was misreported.  
+As only 13 observations are concerned, we proceed to a manual modification of the data on Excel, as it appears as simpler and more efficient.
+
+```{r, echo=FALSE}
+
+CIL2 <- read.csv(file="CILbis.csv", header=TRUE, sep=";")
+attach(CIL2)
+dept <- str_sub(Code_Postal, start = 1, end = 2)
+
+# or print(xtable(as.data.frame(table(dept))), type="html")
+
+kable(as.data.frame(table(dept)))
+
+```
+
+Note that there are 61 missing observations.
+
+### Step 3
+
+```{r, include=FALSE}
+
+SIRENFILE <- "SIREN.csv"
+index <- 0
+chunksize <- 300000 #There will be 300,000 rows in each chunk
+con <- file(description = SIRENFILE, open="r") #We establish the connection
+datachunk <- read.table(con, nrows = chunksize, header = TRUE, fill = TRUE, sep = ";")
+actualcolnames <- names(datachunk) #There is a header in the first one, but not in the other. The columns will have a name (to connect them properly with the other chunks)
+#But each chunk starting from the second one won't have a header.
+
+system.time(repeat{
+  index <- index +  1
+  print(paste('Processing rows:', index * chunksize))
+  #to know where we are in the reading of this HUGE file
+  
+  MERGEDDATA <- merge(x = CIL2, y = datachunk, by.x = "?..Siren", by.y = "SIREN",
+                      all.x = FALSE, all.y = FALSE)
+  
+  if (nrow(datachunk) !=chunksize){
+    #everytime we've read a chunk, is the size of the chunk we just read not equal to the chunksize that we asked for (100,000 rows)? If it's not equal, then it's the end of the process
+    print('Processed all chunks!')
+    break} #in order for the loop not to go on forever
+  
+  datachunk <- read.table(con, nrows=chunksize, skip=0, header = FALSE, fill = TRUE,
+                          sep = ";", col.names = actualcolnames)
+  #in order to go on if there is still data to process
+})
+
+close(con)
+
+```
+
+After running this command, the "system.time" function allows us to say that the process took 20.84 minutes. We have a 4Gb RAM, with available 3.78Gb. On a MacBook Air with an 8Gb RAM, the command should run faster. That's why we kept 300,000 rows in each chunk. We hope it will fit in 10 minutes on your computer.  
+
+```{r, echo=FALSE}
+
+nrow(MERGEDDATA)
+
+```
+
+There are only 2,117 observations in the merged dataset. We suspect that the SIREN dataset was not properly coded: indeed, if the SIRET was put in the SIREN column, the loop could not detect it.  
+We run another loop in order to select the 9 first figures of each observation in the column SIREN, and run the first loop again using the new variable SIREN2 that we created. 
+
+```{r, eval=FALSE, include=FALSE}
+
+SIRENFILE <- "SIREN.csv"
+index <- 0
+chunksize <- 100000
+con <- file(description = SIRENFILE, open="r")
+datachunk <- read.table(con, nrows = chunksize, header = TRUE, fill = TRUE, sep = ";")
+actualcolnames <- names(datachunk)
+
+repeat{
+  index <- index +  1
+  print(paste('Processing rows:', index * chunksize))
+  #to know where we are in the reading of this HUGE file
+  
+  attach(datachunk)
+  SIRENFILE$SIREN2 <- str_sub(SIREN, start = 1, end = 9)
+  
+  if (nrow(datachunk) !=chunksize){
+    #everytime we've read a chunk, is the size of the chunk we just read not equal to the chunksize that we asked for (100,000 rows)? If it's not equal, then it's the end of the process
+    print('Processed all files!')
+    break} #in order for the loop not to go on forever
+  
+  datachunk <- read.table(con, nrows=chunksize, skip=0, header = FALSE, fill = TRUE,
+                          sep = ";", col.names = actualcolnames)
+  #in order to go on if there is still data to process
+  break
+}
+
+close(con)
+
+```
+
+By running the command, we get the following error message: "Error: cannot allocate vector of size 781 Kb". The vector is too large for R to handle it. (If you wish, refer to the RMarkdown file.)  
+
+Therefore, we use the merged data set that we found in the first place, that is, *MERGEDDATA*.
+
+### Step 4
+
+```{r, echo=FALSE}
+
+attach(MERGEDDATA)
+
+ggplot(MERGEDDATA[which(MERGEDDATA$EFENCENT != "NN"),]) + 
+  geom_bar(mapping = aes(x = EFENCENT), color = "orange", fill = "orange")
+
+```
+
+There is no clear pattern to draw from this graph. Indeed, using the SIREN number, a company that has several annexes in France (like Quick, that has a great number of restaurants) appears several times in the data set. Therefore, it may be over-represented in the histogram.  
+
+We can use the values of the number of employees in each annex, using the *EFETCENT* variable.
+
+```{r}
+
+ggplot(MERGEDDATA[which(MERGEDDATA$EFETCENT != "NN"),]) + 
+  geom_bar(mapping = aes(x = EFETCENT), color = "orange", fill = "orange")
+
+```
+
+There is still no clear pattern. Indeed, we do not have precise values of the number of employees for each annex. Only an order of magnitude is given.  
+Still, we expected the number of companies that nominated a CIL to be greater for larger companies than for smaller ones. We think that the histogram would have shown this if the data were more precise.
+
