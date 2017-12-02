@@ -8,7 +8,9 @@ output: html_document
 URL of our repository: https://github.com/LouisSirugue/CHALLENGE_B_2017
 
 ```{r setup, include=FALSE}
+
 knitr::opts_chunk$set(warning = FALSE)
+
 ```
 
 ```{r, include=FALSE}
