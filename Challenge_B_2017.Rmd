@@ -7,13 +7,15 @@ output: html_document
 
 URL of our repository: https://github.com/LouisSirugue/CHALLENGE_B_2017
 
+### Please note that it was not possible to upload the SIREN dataset (nor its zipped version) on GitHub (the file is larger than 25Mb). Therefore, it is needed for you to have a copy of the unzipped file (under the name of "SIREN.csv") in the project folder that you cloned in order to be able to run the third task smoothly.
+
 ```{r setup, include=FALSE}
 
 knitr::opts_chunk$set(warning = FALSE)
 
 ```
 
-```{r, include=FALSE}
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 
 load.libraries <- c('readxl','np','tidyverse', 'randomForest', 'car', 'caret', 'knitr', 'stringr', 'dplyr')
 install.lib <- load.libraries[!load.libraries %in% installed.packages()]
@@ -32,7 +34,7 @@ We are going to use the Random Forests method. The idea behind this method is th
 
 We train the Random Forests technique on the training data.
 
-```{r, include=FALSE}
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 
 rm(list=ls())
 
@@ -74,7 +76,7 @@ train %>% summarise_all(.funs = funs(sum(is.na(.)))) %>% gather(key = "feature",
 
 ```
 
-```{r, include=FALSE}
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 
 #We finally apply the random forests method to the training data.
 training.rf = randomForest(SalePrice ~ MSSubClass + MSZoning + LotArea + Street + LotShape
@@ -106,7 +108,7 @@ Mean of squared residuals: 797703297
 
 We use the Random Forests model to make predictions on the test data.
 
-```{r, include=FALSE}
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 
 test <- read.table(file = "test.csv", header = TRUE, sep = ",")
 
@@ -159,7 +161,7 @@ test.rf <- predict(object = training.rf, newdata = test, predict.all = FALSE)
 
 Then, we estimate a simple linear regression model based on the training data, from which we deleted the missing observations and the ID feature. We use the variables that were in the best regression we made during the first challenge. 
 
-```{r, include=FALSE}
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 
 reg <- lm(SalePrice ~ MSSubClass + LotArea + OverallQual + OverallCond + YearBuilt
           + MasVnrArea + BsmtFinSF1 + X1stFlrSF + X2ndFlrSF + BsmtFullBath + BedroomAbvGr
@@ -171,7 +173,7 @@ preds <- predict.lm(reg, test)
 
 We plot the predictions given both by the Random Forests model and the simple linear regression model.
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 
 ggplot() + geom_line(aes(x = test$Id, y = preds), colour = "blue") + geom_point(aes(x = test$Id, y = test.rf), colour = "green", size = 1)
 
@@ -183,7 +185,7 @@ The difference in their variances is difficult to identify visually.
 
 # Task 2B - Overfitting in Machine Learning (continued)
 
-```{r, include=FALSE}
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 
 #Previously, in "Overfitting in Machine Learning"
 
@@ -215,7 +217,7 @@ test2 <- dataframe %>% filter(which.data == "test2")
 
 Here is the summary of the low flexibility local linear model.
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 
 ll.fit.lowflex <- npreg(y ~ x, data = training2, method = "ll", bws = 0.5)
 summary(ll.fit.lowflex)
@@ -226,7 +228,7 @@ summary(ll.fit.lowflex)
 
 Here is the summary of the high flexibility local linear model.
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 
 ll.fit.highflex <- npreg(y ~ x, data = training2, method = "ll", bws = 0.01)
 summary(ll.fit.highflex)
@@ -245,7 +247,7 @@ The following graph depicts, for the training data:
   + The predictions given by the high flexibility local linear model (blue line)
   + The predictions given by the low flexibility local linear model (red line)
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 
 ggplot(data=training2) + geom_point(aes(x,y)) + geom_line(aes(x=x,y=x^3), colour = "black" ) + geom_line(aes(x=x, y=y.ll.highflex), colour = "blue") + geom_line(aes(x=x, y=y.ll.lowflex), colour = "red")
 
@@ -263,7 +265,7 @@ The following graph depicts, for the test data:
   + The predictions given by the high flexibility local linear model (green line)  
   + The predictions given by the low flexibility local linear model (blue line)
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 
 #We add the predictions based on both the high and low flexibility models in the dataset "test2"
 test2 <- test2 %>% mutate(y.ll.lowflex = predict(object = ll.fit.lowflex, newdata = test2), y.ll.highflex = predict(object = ll.fit.highflex, newdata = test2))
@@ -284,18 +286,19 @@ However, the high flexibility model gives the most biased predictions. Indeed, t
 
 We create a vector of bandwidth going from 0.01 to 0.5 with a step of 0.001.
 
-```{r vector, include=FALSE}
+```{r vector, message=FALSE, warning=FALSE, include=FALSE}
 
 vector <- seq(from = 0.01, to = 0.5, by = 0.001)
 length(vector)
 
 ```
+It has a length equal to 491.
 
 ### Step 7
 
 We estimate a local linear model on the training data with each bandwidth.
 
-```{r, include=FALSE}
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 
 #We apply the function npreg on the training data.
 #Each element of the vector will determine the bandwidth that will be used for each model.
@@ -309,7 +312,7 @@ We obtain 491 different models: one for each bandwidth.
 
 We compute the MSE on the training data, and this for each bandwidth.
 
-```{r, include=FALSE}
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 
 #We create an object, fit.model, that will be used just for the loop
 #mse.training will be a function that computes the MSE for each model
@@ -329,7 +332,7 @@ We obtain a vector of 491 different MSEs, one for each model.
 
 We compute the MSE on the test data, and this for each bandwidth.
 
-```{r, include=FALSE}
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 
 #We use the same strategy as the one used for step 8, but this time on the test data
 mse.test <- function(fit.model){
@@ -346,7 +349,7 @@ Again, we obtain a vector of 491 different MSEs, one for each model.
 We plot how the Mean Squared Errors on the training and test data change when the bandwidth
 increases. The blue line corresponds on the MSEs of the training data, whereas the orange line shows the change in the MSEs as the bandwidth increases.
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 
 #We put the results obtained beforehand in a data frame so as to plot the MSEs more easily
 mse.dataframe <- tbl_df(data.frame(bandwidth = vector, mse.train = mse.train.results, mse.test = mse.test.results))
@@ -366,7 +369,7 @@ However, as the bandwidth is low, the MSE will be very large because of the bias
 
 We import the CIL dataset.
 
-```{r, include=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 
 rm(list=ls())
 
@@ -388,7 +391,7 @@ By viewing the data and ordering it by postcode, two problems arise:
 - The data was not coded properly: some observations have the postal code and the city inverted, or simply the postal code was misreported.  
 As only 13 observations are concerned, we proceed to a manual modification of the data on Excel, as it appears as simpler and more efficient.
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 
 CIL2 <- read.csv(file="CILbis.csv", header=TRUE, sep=";")
 attach(CIL2)
@@ -404,7 +407,7 @@ Note that there are 61 missing observations.
 
 ### Step 3
 
-```{r, include=FALSE}
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 
 SIRENFILE <- "SIREN.csv"
 index <- 0
@@ -414,12 +417,16 @@ datachunk <- read.table(con, nrows = chunksize, header = TRUE, fill = TRUE, sep 
 actualcolnames <- names(datachunk) #There is a header in the first one, but not in the other. The columns will have a name (to connect them properly with the other chunks)
 #But each chunk starting from the second one won't have a header.
 
+```
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+
 system.time(repeat{
   index <- index +  1
   print(paste('Processing rows:', index * chunksize))
   #to know where we are in the reading of this HUGE file
   
-  MERGEDDATA <- merge(x = CIL2, y = datachunk, by.x = "?..Siren", by.y = "SIREN",
+  MERGEDDATA <- merge(x = CIL2, y = datachunk, by.x = "ï..Siren", by.y = "SIREN",
                       all.x = FALSE, all.y = FALSE)
   
   if (nrow(datachunk) !=chunksize){
@@ -447,7 +454,7 @@ nrow(MERGEDDATA)
 There are only 2,117 observations in the merged dataset. We suspect that the SIREN dataset was not properly coded: indeed, if the SIRET was put in the SIREN column, the loop could not detect it.  
 We run another loop in order to select the 9 first figures of each observation in the column SIREN, and run the first loop again using the new variable SIREN2 that we created. 
 
-```{r, eval=FALSE, include=FALSE}
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 
 SIRENFILE <- "SIREN.csv"
 index <- 0
@@ -485,7 +492,7 @@ Therefore, we use the merged data set that we found in the first place, that is,
 
 ### Step 4
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 
 attach(MERGEDDATA)
 
@@ -498,7 +505,7 @@ There is no clear pattern to draw from this graph. Indeed, using the SIREN numbe
 
 We can use the values of the number of employees in each annex, using the *EFETCENT* variable.
 
-```{r}
+```{r, echo=FALSE}
 
 ggplot(MERGEDDATA[which(MERGEDDATA$EFETCENT != "NN"),]) + 
   geom_bar(mapping = aes(x = EFETCENT), color = "orange", fill = "orange")
